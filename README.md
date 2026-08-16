@@ -70,7 +70,7 @@ Las contribuciones son bienvenidas. Si quieres proponer un cambio:
 
 Si te resulta útil, puedes invitarme a un café:
 
-![PayPal](https://paypal.me/Davidnt20)
+[![PayPal](https://img.shields.io/badge/PayPal-Donar-00457C?logo=paypal)](https://paypal.me/Davidnt20)
 
 ## 📄 Licencia
 
