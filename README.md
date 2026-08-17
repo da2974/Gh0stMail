@@ -26,8 +26,15 @@ de entrada y detectar automáticamente códigos de verificación.
 - Icono en la bandeja del sistema; la app puede seguir en segundo plano
   al cerrar la ventana (configurable)
 - Tema claro u oscuro
+- Idioma español o inglés, seleccionable desde Ajustes
 - Exportar una dirección (y su contraseña, si aplica) a un archivo de texto
 - Intervalos de autoactualización y de espera configurables
+
+## 🌐 Idiomas
+
+La aplicación está disponible en **español** e **inglés**. Puedes cambiar
+el idioma en cualquier momento desde Ajustes → General → Idioma; el cambio
+se aplica al instante, sin reiniciar la aplicación.
 
 ## 🚀 Instalación
 
@@ -55,6 +62,7 @@ pythonw main.py
 | `configuracion.py` / `almacenamiento.py` | Persistencia en JSON |
 | `notificaciones.py` | Notificaciones de escritorio vía bandeja del sistema |
 | `utilidades.py` | Detección de códigos y formateo de fechas |
+| `idiomas.py` | Textos de la interfaz en español e inglés |
 | `tema_claro.qss` / `tema_oscuro.qss` | Hojas de estilo |
 
 ## 🤝 Contribuir
