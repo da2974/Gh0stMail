@@ -40,7 +40,7 @@ pip install -r requirements.txt
 ## ▶️ Uso
 
 ```bash
-python main.py
+pythonw main.py
 ```
 
 ## 📁 Estructura del proyecto
