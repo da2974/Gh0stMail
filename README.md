@@ -39,7 +39,7 @@ se aplica al instante, sin reiniciar la aplicación.
 ## 🚀 Instalación
 
 ```bash
-git clone https://github.com/tu-usuario/gestor-correo-temporal.git
+git clone https://github.com/da2974/Gh0stMail.git
 cd Gh0stMail
 pip install -r requirements.txt
 ```
