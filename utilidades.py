@@ -1,11 +1,3 @@
-"""
-utilidades.py
-
-Funciones auxiliares independientes de la interfaz: detección de códigos
-de verificación (con patrón por defecto o uno definido por el usuario),
-formateo de fechas y validación de expresiones regulares.
-"""
-
 import re
 from datetime import datetime
 

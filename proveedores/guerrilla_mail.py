@@ -1,12 +1,3 @@
-"""
-proveedores/guerrilla_mail.py
-
-Implementación del proveedor Guerrilla Mail sobre la interfaz común
-ProveedorCorreoTemporal. A diferencia de mail.tm, Guerrilla Mail no usa
-tokens Bearer: identifica la sesión mediante un "sid_token" que viaja como
-parámetro de consulta en cada petición.
-"""
-
 import requests
 
 from .base import (
@@ -44,14 +35,12 @@ class ProveedorGuerrillaMail(ProveedorCorreoTemporal):
 
         return {
             "address": direccion,
-            "password": "",  # Guerrilla Mail no usa contraseña, la sesión es el sid_token
+            "password": "",
             "proveedor": self.identificador,
             "datos_proveedor": {"sid_token": sid_token},
         }
 
     def refrescar_sesion(self, cuenta):
-        # Guerrilla Mail extiende la sesión automáticamente con cada consulta
-        # que incluya el sid_token; no requiere una renovación explícita.
         return
 
     def listar_mensajes(self, cuenta):
@@ -70,8 +59,6 @@ class ProveedorGuerrillaMail(ProveedorCorreoTemporal):
         crudos = datos.get("list", [])
         resultado = []
         for m in crudos:
-            # Guerrilla Mail incluye un mensaje de bienvenida con id "1" que
-            # no es un correo real recibido; se omite de la bandeja.
             if str(m.get("mail_id")) == "1" and "welcome" in (m.get("mail_subject") or "").lower():
                 continue
             resultado.append(

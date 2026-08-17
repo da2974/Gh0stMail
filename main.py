@@ -1,20 +1,3 @@
-#!/usr/bin/env python3
-"""
-Gestor de Correo Temporal
-=========================
-
-Aplicación de escritorio para crear y administrar direcciones de correo
-electrónico temporales, revisar su bandeja de entrada, localizar
-automáticamente códigos de verificación recibidos y consultar el
-historial de mensajes de direcciones anteriores.
-
-Requiere:
-    pip install PySide6 requests
-
-Ejecución:
-    python3 main.py
-"""
-
 import os
 import sys
 
@@ -49,6 +32,8 @@ from PySide6.QtWidgets import (
 import configuracion
 import almacenamiento
 import utilidades
+import idiomas
+from idiomas import t
 from gestor_proveedores import GestorProveedores
 from proveedores.base import MensajeResumen
 from notificaciones import GestorNotificaciones
@@ -69,8 +54,6 @@ NOMBRES_PROVEEDOR_VISIBLE = {
 
 
 def _construir_icono_aplicacion():
-    """Genera un icono simple en tiempo de ejecución (un sobre estilizado)
-    para no depender de un archivo de imagen externo."""
     pixmap = QPixmap(64, 64)
     pixmap.fill(Qt.transparent)
 
@@ -92,10 +75,6 @@ def _construir_icono_aplicacion():
     return QIcon(pixmap)
 
 
-# ----------------------------------------------------------------------
-# Widget de fila de dirección en la lista lateral
-# ----------------------------------------------------------------------
-
 class ItemDireccion(QListWidgetItem):
     def __init__(self, cuenta):
         nombre_proveedor = NOMBRES_PROVEEDOR_VISIBLE.get(
@@ -107,24 +86,22 @@ class ItemDireccion(QListWidgetItem):
         self.setSizeHint(QSize(0, 58))
 
 
-# ----------------------------------------------------------------------
-# Ventana principal
-# ----------------------------------------------------------------------
-
 class VentanaPrincipal(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Gestor de Correo Temporal")
+        self.configuracion = configuracion.cargar_configuracion()
+        idiomas.establecer_idioma(self.configuracion.get("idioma", "es"))
+
+        self.setWindowTitle(t("titulo_app"))
         self.resize(1200, 720)
         self.setMinimumSize(1000, 580)
 
-        self.configuracion = configuracion.cargar_configuracion()
         self.gestor_proveedores = GestorProveedores()
         self.cuentas = almacenamiento.cargar_cuentas()
         self.historial = almacenamiento.cargar_historial()
 
-        self.mensajes_actuales = []       # lista de MensajeResumen de la cuenta activa
-        self.viendo_historial = False     # True si se está mostrando historial, no bandeja en vivo
+        self.mensajes_actuales = []
+        self.viendo_historial = False
         self.codigo_actual = None
         self.hilo_activo = None
         self.hilo_espera = None
@@ -146,23 +123,20 @@ class VentanaPrincipal(QMainWindow):
         self.temporizador.timeout.connect(self._autoactualizar_silencioso)
         self.temporizador.start(self.configuracion["intervalo_autoactualizacion_seg"] * 1000)
 
-    # ------------------------------------------------------------------
-    # Bandeja del sistema
-    # ------------------------------------------------------------------
 
     def _construir_bandeja_sistema(self):
         self.icono_bandeja = QSystemTrayIcon(self._icono_app, self)
-        self.icono_bandeja.setToolTip("Gestor de Correo Temporal")
+        self.icono_bandeja.setToolTip(t("titulo_app"))
 
         menu = QMenu()
-        accion_mostrar = QAction("Mostrar ventana", self)
-        accion_mostrar.triggered.connect(self._mostrar_desde_bandeja)
-        accion_salir = QAction("Salir", self)
-        accion_salir.triggered.connect(self._salir_completamente)
+        self.accion_mostrar_bandeja = QAction(t("menu_mostrar_ventana"), self)
+        self.accion_mostrar_bandeja.triggered.connect(self._mostrar_desde_bandeja)
+        self.accion_salir_bandeja = QAction(t("menu_salir"), self)
+        self.accion_salir_bandeja.triggered.connect(self._salir_completamente)
 
-        menu.addAction(accion_mostrar)
+        menu.addAction(self.accion_mostrar_bandeja)
         menu.addSeparator()
-        menu.addAction(accion_salir)
+        menu.addAction(self.accion_salir_bandeja)
 
         self.icono_bandeja.setContextMenu(menu)
         self.icono_bandeja.activated.connect(self._al_activar_icono_bandeja)
@@ -181,9 +155,6 @@ class VentanaPrincipal(QMainWindow):
         self._salir_solicitado = True
         self.close()
 
-    # ------------------------------------------------------------------
-    # Construcción de la interfaz
-    # ------------------------------------------------------------------
 
     def _construir_interfaz(self):
         widget_central = QWidget()
@@ -216,7 +187,7 @@ class VentanaPrincipal(QMainWindow):
 
         self.barra_estado = QStatusBar()
         self.setStatusBar(self.barra_estado)
-        self.barra_estado.showMessage("Listo.")
+        self.barra_estado.showMessage(t("listo"))
 
     def _crear_barra_superior(self):
         barra = QFrame()
@@ -229,18 +200,18 @@ class VentanaPrincipal(QMainWindow):
         bloque_titulos = QVBoxLayout()
         bloque_titulos.setSpacing(0)
 
-        titulo = QLabel("Gestor de Correo Temporal")
-        titulo.setObjectName("tituloApp")
-        subtitulo = QLabel("Direcciones desechables para verificaciones y registros puntuales")
-        subtitulo.setObjectName("subtituloApp")
+        self.etiqueta_titulo_app = QLabel(t("titulo_app"))
+        self.etiqueta_titulo_app.setObjectName("tituloApp")
+        self.etiqueta_subtitulo_app = QLabel(t("subtitulo_app"))
+        self.etiqueta_subtitulo_app.setObjectName("subtituloApp")
 
-        bloque_titulos.addWidget(titulo)
-        bloque_titulos.addWidget(subtitulo)
+        bloque_titulos.addWidget(self.etiqueta_titulo_app)
+        bloque_titulos.addWidget(self.etiqueta_subtitulo_app)
 
         layout.addLayout(bloque_titulos)
         layout.addStretch()
 
-        self.boton_ajustes = QPushButton("⚙  Ajustes")
+        self.boton_ajustes = QPushButton(t("boton_ajustes"))
         self.boton_ajustes.setObjectName("botonSecundario")
         self.boton_ajustes.setCursor(Qt.PointingHandCursor)
         self.boton_ajustes.clicked.connect(self._abrir_ajustes)
@@ -256,20 +227,20 @@ class VentanaPrincipal(QMainWindow):
         layout.setSpacing(10)
 
         fila_encabezado = QHBoxLayout()
-        encabezado = QLabel("DIRECCIONES CREADAS")
-        encabezado.setObjectName("encabezadoPanel")
-        fila_encabezado.addWidget(encabezado)
+        self.etiqueta_encabezado_direcciones = QLabel(t("encabezado_direcciones"))
+        self.etiqueta_encabezado_direcciones.setObjectName("encabezadoPanel")
+        fila_encabezado.addWidget(self.etiqueta_encabezado_direcciones)
         fila_encabezado.addStretch()
         layout.addLayout(fila_encabezado)
 
-        self.boton_nueva_direccion = QPushButton("＋  Nueva dirección")
+        self.boton_nueva_direccion = QPushButton(t("boton_nueva_direccion"))
         self.boton_nueva_direccion.setObjectName("botonPrimario")
         self.boton_nueva_direccion.setCursor(Qt.PointingHandCursor)
         self.boton_nueva_direccion.clicked.connect(self._accion_crear_cuenta)
         layout.addWidget(self.boton_nueva_direccion)
 
         self.campo_busqueda_direcciones = QLineEdit()
-        self.campo_busqueda_direcciones.setPlaceholderText("Buscar dirección…")
+        self.campo_busqueda_direcciones.setPlaceholderText(t("placeholder_buscar_direccion"))
         self.campo_busqueda_direcciones.textChanged.connect(self._filtrar_lista_direcciones)
         layout.addWidget(self.campo_busqueda_direcciones)
 
@@ -280,22 +251,22 @@ class VentanaPrincipal(QMainWindow):
 
         self.campo_direccion_actual = QLineEdit()
         self.campo_direccion_actual.setReadOnly(True)
-        self.campo_direccion_actual.setPlaceholderText("Selecciona o crea una dirección")
+        self.campo_direccion_actual.setPlaceholderText(t("placeholder_direccion_actual"))
         self.campo_direccion_actual.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.campo_direccion_actual)
 
         fila_botones_pie = QHBoxLayout()
-        self.boton_copiar_direccion = QPushButton("Copiar")
+        self.boton_copiar_direccion = QPushButton(t("boton_copiar"))
         self.boton_copiar_direccion.setObjectName("botonSecundario")
         self.boton_copiar_direccion.setCursor(Qt.PointingHandCursor)
         self.boton_copiar_direccion.clicked.connect(self._accion_copiar_direccion)
 
-        self.boton_exportar_cuenta = QPushButton("Exportar")
+        self.boton_exportar_cuenta = QPushButton(t("boton_exportar"))
         self.boton_exportar_cuenta.setObjectName("botonSecundario")
         self.boton_exportar_cuenta.setCursor(Qt.PointingHandCursor)
         self.boton_exportar_cuenta.clicked.connect(self._accion_exportar_cuenta)
 
-        self.boton_eliminar_direccion = QPushButton("Eliminar")
+        self.boton_eliminar_direccion = QPushButton(t("boton_eliminar"))
         self.boton_eliminar_direccion.setObjectName("botonPeligro")
         self.boton_eliminar_direccion.setCursor(Qt.PointingHandCursor)
         self.boton_eliminar_direccion.clicked.connect(self._accion_eliminar_cuenta)
@@ -315,23 +286,23 @@ class VentanaPrincipal(QMainWindow):
         layout.setSpacing(10)
 
         fila_encabezado = QHBoxLayout()
-        self.etiqueta_encabezado_bandeja = QLabel("BANDEJA DE ENTRADA")
+        self.etiqueta_encabezado_bandeja = QLabel(t("encabezado_bandeja_entrada"))
         self.etiqueta_encabezado_bandeja.setObjectName("encabezadoPanel")
         fila_encabezado.addWidget(self.etiqueta_encabezado_bandeja)
         fila_encabezado.addStretch()
 
-        self.boton_ver_historial = QPushButton("Ver historial")
+        self.boton_ver_historial = QPushButton(t("boton_ver_historial"))
         self.boton_ver_historial.setObjectName("botonSecundario")
         self.boton_ver_historial.setCursor(Qt.PointingHandCursor)
         self.boton_ver_historial.setCheckable(True)
         self.boton_ver_historial.clicked.connect(self._alternar_vista_historial)
 
-        self.boton_actualizar = QPushButton("Actualizar")
+        self.boton_actualizar = QPushButton(t("boton_actualizar"))
         self.boton_actualizar.setObjectName("botonSecundario")
         self.boton_actualizar.setCursor(Qt.PointingHandCursor)
         self.boton_actualizar.clicked.connect(self._accion_actualizar_mensajes)
 
-        self.boton_esperar_codigo = QPushButton("Esperar mensaje nuevo")
+        self.boton_esperar_codigo = QPushButton(t("boton_esperar_mensaje"))
         self.boton_esperar_codigo.setObjectName("botonPrimario")
         self.boton_esperar_codigo.setCursor(Qt.PointingHandCursor)
         self.boton_esperar_codigo.clicked.connect(self._accion_esperar_codigo)
@@ -342,7 +313,7 @@ class VentanaPrincipal(QMainWindow):
         layout.addLayout(fila_encabezado)
 
         self.campo_busqueda_mensajes = QLineEdit()
-        self.campo_busqueda_mensajes.setPlaceholderText("Buscar por remitente o asunto…")
+        self.campo_busqueda_mensajes.setPlaceholderText(t("placeholder_buscar_mensajes"))
         self.campo_busqueda_mensajes.textChanged.connect(self._filtrar_tabla_mensajes)
         layout.addWidget(self.campo_busqueda_mensajes)
 
@@ -354,7 +325,7 @@ class VentanaPrincipal(QMainWindow):
         splitter_vertical = QSplitter(Qt.Vertical)
 
         self.tabla_mensajes = QTableWidget(0, 3)
-        self.tabla_mensajes.setHorizontalHeaderLabels(["Remitente", "Asunto", "Recibido"])
+        self.tabla_mensajes.setHorizontalHeaderLabels([t("columna_remitente"), t("columna_asunto"), t("columna_recibido")])
         self.tabla_mensajes.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.tabla_mensajes.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.tabla_mensajes.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
@@ -395,16 +366,16 @@ class VentanaPrincipal(QMainWindow):
         layout.setAlignment(Qt.AlignCenter)
         layout.setSpacing(6)
 
-        titulo = QLabel("Ninguna dirección seleccionada")
-        titulo.setObjectName("estadoVacioTitulo")
-        titulo.setAlignment(Qt.AlignCenter)
+        self.etiqueta_vacio_titulo = QLabel(t("estado_vacio_titulo"))
+        self.etiqueta_vacio_titulo.setObjectName("estadoVacioTitulo")
+        self.etiqueta_vacio_titulo.setAlignment(Qt.AlignCenter)
 
-        texto = QLabel("Crea o selecciona una dirección de la izquierda\npara ver su bandeja de entrada.")
-        texto.setObjectName("estadoVacioTexto")
-        texto.setAlignment(Qt.AlignCenter)
+        self.etiqueta_vacio_texto = QLabel(t("estado_vacio_texto"))
+        self.etiqueta_vacio_texto.setObjectName("estadoVacioTexto")
+        self.etiqueta_vacio_texto.setAlignment(Qt.AlignCenter)
 
-        layout.addWidget(titulo)
-        layout.addWidget(texto)
+        layout.addWidget(self.etiqueta_vacio_titulo)
+        layout.addWidget(self.etiqueta_vacio_texto)
         return pagina
 
     def _crear_tarjeta_codigo(self):
@@ -415,18 +386,18 @@ class VentanaPrincipal(QMainWindow):
 
         bloque_texto = QVBoxLayout()
         bloque_texto.setSpacing(2)
-        titulo = QLabel("CÓDIGO DETECTADO")
-        titulo.setObjectName("etiquetaCodigoTitulo")
+        self.etiqueta_codigo_titulo = QLabel(t("codigo_detectado"))
+        self.etiqueta_codigo_titulo.setObjectName("etiquetaCodigoTitulo")
         self.etiqueta_valor_codigo = QLabel("")
         self.etiqueta_valor_codigo.setObjectName("etiquetaCodigo")
 
-        bloque_texto.addWidget(titulo)
+        bloque_texto.addWidget(self.etiqueta_codigo_titulo)
         bloque_texto.addWidget(self.etiqueta_valor_codigo)
 
         layout.addLayout(bloque_texto)
         layout.addStretch()
 
-        self.boton_copiar_codigo = QPushButton("Copiar código")
+        self.boton_copiar_codigo = QPushButton(t("boton_copiar_codigo"))
         self.boton_copiar_codigo.setObjectName("botonSecundario")
         self.boton_copiar_codigo.setCursor(Qt.PointingHandCursor)
         self.boton_copiar_codigo.clicked.connect(self._accion_copiar_codigo)
@@ -434,9 +405,6 @@ class VentanaPrincipal(QMainWindow):
 
         return tarjeta
 
-    # ------------------------------------------------------------------
-    # Utilidades de estado y tema
-    # ------------------------------------------------------------------
 
     def _fijar_estado(self, mensaje, tiempo_ms=5000):
         self.barra_estado.showMessage(mensaje, tiempo_ms)
@@ -474,9 +442,6 @@ class VentanaPrincipal(QMainWindow):
             contenido = f"{item_remitente.text()} {item_asunto.text()}".lower()
             self.tabla_mensajes.setRowHidden(fila, texto not in contenido)
 
-    # ------------------------------------------------------------------
-    # Lista de direcciones
-    # ------------------------------------------------------------------
 
     def _poblar_lista_cuentas(self):
         self.lista_direcciones.blockSignals(True)
@@ -503,8 +468,8 @@ class VentanaPrincipal(QMainWindow):
 
     def _accion_crear_cuenta(self):
         self.boton_nueva_direccion.setEnabled(False)
-        self.boton_nueva_direccion.setText("Creando dirección…")
-        self._fijar_estado("Creando una nueva dirección de correo…")
+        self.boton_nueva_direccion.setText(t("boton_creando_direccion"))
+        self._fijar_estado(t("estado_creando_direccion"))
 
         preferencia = self.configuracion.get("proveedor_preferido", "auto")
         self.hilo_activo = TareaCrearCuenta(self.gestor_proveedores, preferencia)
@@ -523,32 +488,29 @@ class VentanaPrincipal(QMainWindow):
         self.lista_direcciones.setCurrentItem(item)
 
         self.boton_nueva_direccion.setEnabled(True)
-        self.boton_nueva_direccion.setText("＋  Nueva dirección")
+        self.boton_nueva_direccion.setText(t("boton_nueva_direccion"))
 
         nombre_proveedor = NOMBRES_PROVEEDOR_VISIBLE.get(identificador_proveedor, identificador_proveedor)
-        self._fijar_estado(f"Dirección creada con {nombre_proveedor}: {datos_cuenta['address']}")
+        self._fijar_estado(t("estado_direccion_creada", proveedor=nombre_proveedor, direccion=datos_cuenta["address"]))
 
     def _al_crear_cuenta_error(self, mensaje):
         self.boton_nueva_direccion.setEnabled(True)
-        self.boton_nueva_direccion.setText("＋  Nueva dirección")
-        self._fijar_estado("No se pudo crear la dirección.")
-        self._mostrar_error("Gestor de Correo Temporal", f"No se pudo crear la dirección.\n\n{mensaje}")
+        self.boton_nueva_direccion.setText(t("boton_nueva_direccion"))
+        self._fijar_estado(t("estado_no_se_pudo_crear"))
+        self._mostrar_error(t("titulo_app"), t("error_no_se_pudo_crear_detalle", detalle=mensaje))
 
     def _accion_eliminar_cuenta(self):
         cuenta = self._cuenta_actual()
         if cuenta is None:
             QMessageBox.information(
-                self, "Gestor de Correo Temporal", "Selecciona primero una dirección de la lista."
+                self, t("titulo_app"), t("dialogo_seleccionar_direccion")
             )
             return
 
         respuesta = QMessageBox.question(
             self,
-            "Eliminar dirección",
-            f"¿Quitar «{cuenta['address']}» de la lista?\n\n"
-            "Esto solo elimina el registro local; la cuenta puede seguir "
-            "existiendo en el proveedor. El historial de mensajes de esta "
-            "dirección también se eliminará.",
+            t("titulo_eliminar_direccion"),
+            t("confirmar_eliminar_direccion", direccion=cuenta["address"]),
             QMessageBox.Yes | QMessageBox.No,
         )
         if respuesta != QMessageBox.Yes:
@@ -568,50 +530,48 @@ class VentanaPrincipal(QMainWindow):
         self.campo_direccion_actual.clear()
         self.pila_bandeja.setCurrentWidget(self.pagina_vacia)
 
-        self._fijar_estado("Dirección eliminada de la lista local.")
+        self._fijar_estado(t("estado_direccion_eliminada"))
 
     def _accion_copiar_direccion(self):
         cuenta = self._cuenta_actual()
         if cuenta is None:
             return
         QApplication.clipboard().setText(cuenta["address"])
-        self._fijar_estado("Dirección copiada al portapapeles.")
+        self._fijar_estado(t("estado_direccion_copiada"))
 
     def _accion_exportar_cuenta(self):
         cuenta = self._cuenta_actual()
         if cuenta is None:
             QMessageBox.information(
-                self, "Gestor de Correo Temporal", "Selecciona primero una dirección de la lista."
+                self, t("titulo_app"), t("dialogo_seleccionar_direccion")
             )
             return
 
         nombre_sugerido = cuenta["address"].replace("@", "_at_") + ".txt"
         ruta_destino, _ = QFileDialog.getSaveFileName(
-            self, "Exportar dirección", nombre_sugerido, "Archivos de texto (*.txt)"
+            self, t("titulo_exportar_direccion"), nombre_sugerido, t("filtro_archivos_texto")
         )
         if not ruta_destino:
             return
 
-        nombre_proveedor = NOMBRES_PROVEEDOR_VISIBLE.get(cuenta.get("proveedor", ""), "Desconocido")
+        nombre_proveedor = NOMBRES_PROVEEDOR_VISIBLE.get(cuenta.get("proveedor", ""), t("exportar_desconocido"))
+        contrasena = cuenta.get("password") or t("exportar_sin_contrasena")
         contenido = (
-            f"Dirección:  {cuenta['address']}\n"
-            f"Contraseña: {cuenta.get('password') or '(este proveedor no usa contraseña)'}\n"
-            f"Proveedor:  {nombre_proveedor}\n"
-            f"Creada:     {cuenta.get('creado', '')}\n"
+            f"{t('exportar_etiqueta_direccion')}:  {cuenta['address']}\n"
+            f"{t('exportar_etiqueta_contrasena')}: {contrasena}\n"
+            f"{t('exportar_etiqueta_proveedor')}:  {nombre_proveedor}\n"
+            f"{t('exportar_etiqueta_creada')}:     {cuenta.get('creado', '')}\n"
         )
 
         try:
             with open(ruta_destino, "w", encoding="utf-8") as f:
                 f.write(contenido)
         except OSError as e:
-            self._mostrar_error("Gestor de Correo Temporal", f"No se pudo guardar el archivo.\n\n{e}")
+            self._mostrar_error(t("titulo_app"), t("error_no_se_pudo_guardar_archivo", detalle=e))
             return
 
-        self._fijar_estado("Dirección exportada correctamente.")
+        self._fijar_estado(t("estado_direccion_exportada"))
 
-    # ------------------------------------------------------------------
-    # Mensajes — bandeja en vivo
-    # ------------------------------------------------------------------
 
     def _accion_actualizar_mensajes(self):
         cuenta = self._cuenta_actual()
@@ -620,9 +580,9 @@ class VentanaPrincipal(QMainWindow):
 
         self.boton_ver_historial.setChecked(False)
         self.viendo_historial = False
-        self.etiqueta_encabezado_bandeja.setText("BANDEJA DE ENTRADA")
+        self.etiqueta_encabezado_bandeja.setText(t("encabezado_bandeja_entrada"))
 
-        self._fijar_estado("Consultando bandeja de entrada…")
+        self._fijar_estado(t("estado_consultando_bandeja"))
         self.boton_actualizar.setEnabled(False)
 
         self.hilo_activo = TareaListarMensajes(self.gestor_proveedores, cuenta)
@@ -638,13 +598,13 @@ class VentanaPrincipal(QMainWindow):
 
         if mensajes:
             self.pila_bandeja.setCurrentIndex(1)
-            self._fijar_estado(f"{len(mensajes)} mensaje(s) en la bandeja.")
+            self._fijar_estado(t("estado_n_mensajes", n=len(mensajes)))
         else:
-            self._fijar_estado("La bandeja está vacía por ahora.")
+            self._fijar_estado(t("estado_bandeja_vacia"))
 
     def _al_listar_mensajes_error(self, mensaje):
         self.boton_actualizar.setEnabled(True)
-        self._fijar_estado("No se pudo actualizar la bandeja de entrada.")
+        self._fijar_estado(t("estado_no_se_pudo_actualizar_bandeja"))
 
     def _refrescar_tabla_mensajes(self):
         self.tabla_mensajes.setRowCount(0)
@@ -692,7 +652,7 @@ class VentanaPrincipal(QMainWindow):
         if cuenta is None:
             return
 
-        self._fijar_estado("Cargando mensaje…")
+        self._fijar_estado(t("estado_cargando_mensaje"))
 
         self.hilo_activo = TareaObtenerMensaje(self.gestor_proveedores, cuenta, mensaje_resumen.id)
         self.hilo_activo.exito.connect(self._al_obtener_mensaje_exito)
@@ -702,10 +662,10 @@ class VentanaPrincipal(QMainWindow):
     def _al_obtener_mensaje_exito(self, mensaje_completo):
         self.texto_cuerpo.setPlainText(mensaje_completo.cuerpo_texto.strip())
         self._detectar_y_mostrar_codigo(mensaje_completo.asunto, mensaje_completo.cuerpo_texto)
-        self._fijar_estado("Mensaje cargado.")
+        self._fijar_estado(t("estado_mensaje_cargado"))
 
     def _al_obtener_mensaje_error(self, mensaje):
-        self._fijar_estado("No se pudo cargar el contenido del mensaje.")
+        self._fijar_estado(t("estado_no_se_pudo_cargar_mensaje"))
 
     def _detectar_y_mostrar_codigo(self, asunto, cuerpo):
         patron_personalizado = self.configuracion.get("patron_codigo_personalizado", "")
@@ -732,9 +692,6 @@ class VentanaPrincipal(QMainWindow):
         QApplication.clipboard().setText(self.codigo_actual)
         self._fijar_estado("Código copiado al portapapeles.")
 
-    # ------------------------------------------------------------------
-    # Historial de mensajes
-    # ------------------------------------------------------------------
 
     def _alternar_vista_historial(self, activo):
         cuenta = self._cuenta_actual()
@@ -748,46 +705,37 @@ class VentanaPrincipal(QMainWindow):
         self.campo_busqueda_mensajes.clear()
 
         if activo:
-            self.etiqueta_encabezado_bandeja.setText("HISTORIAL DE MENSAJES")
+            self.etiqueta_encabezado_bandeja.setText(t("encabezado_historial"))
             entradas = almacenamiento.historial_de_direccion(self.historial, cuenta["address"])
             self.mensajes_actuales = [MensajeResumen.desde_dict(e) for e in entradas]
             self._refrescar_tabla_mensajes()
             self.pila_bandeja.setCurrentIndex(1 if self.mensajes_actuales else 0)
             if not self.mensajes_actuales:
-                self._fijar_estado("Todavía no hay historial guardado para esta dirección.")
+                self._fijar_estado(t("estado_sin_historial"))
             else:
-                self._fijar_estado(f"Mostrando {len(self.mensajes_actuales)} mensaje(s) del historial.")
+                self._fijar_estado(t("estado_mostrando_historial", n=len(self.mensajes_actuales)))
         else:
-            self.etiqueta_encabezado_bandeja.setText("BANDEJA DE ENTRADA")
+            self.etiqueta_encabezado_bandeja.setText(t("encabezado_bandeja_entrada"))
             self._accion_actualizar_mensajes()
 
     def _mostrar_mensaje_de_historial(self, mensaje_resumen):
-        # El historial solo guarda el resumen (remitente/asunto/fecha), no el
-        # cuerpo completo, para no duplicar el almacenamiento del proveedor.
         self.texto_cuerpo.setPlainText(
-            "Este mensaje procede del historial local y solo conserva el "
-            "remitente, el asunto y la fecha; el proveedor no expone su "
-            "cuerpo completo una vez ha sido archivado.\n\n"
-            f"Remitente: {mensaje_resumen.remitente}\n"
-            f"Asunto: {mensaje_resumen.asunto}"
+            t("historial_solo_resumen", remitente=mensaje_resumen.remitente, asunto=mensaje_resumen.asunto)
         )
         self._detectar_y_mostrar_codigo(mensaje_resumen.asunto, "")
 
-    # ------------------------------------------------------------------
-    # Espera activa de un mensaje nuevo
-    # ------------------------------------------------------------------
 
     def _accion_esperar_codigo(self):
         cuenta = self._cuenta_actual()
         if cuenta is None:
-            QMessageBox.information(self, "Gestor de Correo Temporal", "Selecciona primero una dirección.")
+            QMessageBox.information(self, t("titulo_app"), t("dialogo_seleccionar_direccion_simple"))
             return
 
         if self.viendo_historial:
             QMessageBox.information(
                 self,
-                "Gestor de Correo Temporal",
-                "Sal de la vista de historial para poder esperar un mensaje nuevo.",
+                t("titulo_app"),
+                t("estado_salir_de_historial"),
             )
             return
 
@@ -797,8 +745,8 @@ class VentanaPrincipal(QMainWindow):
         ids_conocidos = {m.id for m in self.mensajes_actuales}
 
         self.boton_esperar_codigo.setEnabled(False)
-        self.boton_esperar_codigo.setText("Esperando mensaje nuevo…")
-        self._fijar_estado("Esperando un mensaje nuevo para detectar el código automáticamente…", 0)
+        self.boton_esperar_codigo.setText(t("boton_esperando_mensaje"))
+        self._fijar_estado(t("estado_esperando_mensaje"), 0)
 
         intervalo = self.configuracion.get("intervalo_espera_activa_seg", 5)
         tiempo_maximo = self.configuracion.get("duracion_maxima_espera_min", 2) * 60
@@ -812,10 +760,10 @@ class VentanaPrincipal(QMainWindow):
 
     def _al_esperar_codigo_exito(self, mensajes, nuevo):
         self.boton_esperar_codigo.setEnabled(True)
-        self.boton_esperar_codigo.setText("Esperar mensaje nuevo")
+        self.boton_esperar_codigo.setText(t("boton_esperar_mensaje"))
 
         if not nuevo:
-            self._fijar_estado("No llegó ningún mensaje nuevo en el tiempo de espera.")
+            self._fijar_estado(t("estado_no_llego_mensaje"))
             return
 
         self.mensajes_actuales = mensajes
@@ -829,20 +777,17 @@ class VentanaPrincipal(QMainWindow):
                 self.tabla_mensajes.scrollToItem(self.tabla_mensajes.item(i, 0))
                 break
 
-        self._fijar_estado("Ha llegado un mensaje nuevo.")
+        self._fijar_estado(t("estado_llego_mensaje_nuevo"))
         self.notificador.notificar(
-            "Nuevo mensaje recibido",
-            f"De: {nuevo.remitente}\n{nuevo.asunto}",
+            t("notificacion_nuevo_mensaje_titulo"),
+            t("notificacion_nuevo_mensaje_cuerpo", remitente=nuevo.remitente, asunto=nuevo.asunto),
         )
 
     def _al_esperar_codigo_error(self, mensaje):
         self.boton_esperar_codigo.setEnabled(True)
-        self.boton_esperar_codigo.setText("Esperar mensaje nuevo")
-        self._fijar_estado("Se detuvo la espera por un error de conexión.")
+        self.boton_esperar_codigo.setText(t("boton_esperar_mensaje"))
+        self._fijar_estado(t("estado_espera_detenida_error"))
 
-    # ------------------------------------------------------------------
-    # Autoactualización periódica en segundo plano
-    # ------------------------------------------------------------------
 
     def _autoactualizar_silencioso(self):
         cuenta = self._cuenta_actual()
@@ -855,7 +800,7 @@ class VentanaPrincipal(QMainWindow):
         hilo.exito.connect(self._al_autoactualizar_exito)
         hilo.error.connect(lambda _m: None)
         hilo.start()
-        self._hilo_autoactualizacion = hilo  # referencia para evitar recolección prematura
+        self._hilo_autoactualizacion = hilo
 
     def _al_autoactualizar_exito(self, mensajes):
         ids_antes = {m.id for m in self.mensajes_actuales}
@@ -869,19 +814,16 @@ class VentanaPrincipal(QMainWindow):
             self._registrar_en_historial_si_procede()
             if mensajes:
                 self.pila_bandeja.setCurrentIndex(1)
-            self._fijar_estado("Bandeja de entrada actualizada.")
+            self._fijar_estado(t("estado_bandeja_actualizada"))
 
             if nuevos:
                 primero = nuevos[0]
-                extra = f" (+{len(nuevos) - 1} más)" if len(nuevos) > 1 else ""
+                extra = t("notificacion_mas_mensajes", n=len(nuevos) - 1) if len(nuevos) > 1 else ""
                 self.notificador.notificar(
-                    "Nuevo mensaje recibido",
-                    f"De: {primero.remitente}\n{primero.asunto}{extra}",
+                    t("notificacion_nuevo_mensaje_titulo"),
+                    t("notificacion_nuevo_mensaje_cuerpo_extra", remitente=primero.remitente, asunto=primero.asunto, extra=extra),
                 )
 
-    # ------------------------------------------------------------------
-    # Ajustes
-    # ------------------------------------------------------------------
 
     def _abrir_ajustes(self):
         dialogo = DialogoAjustes(
@@ -894,6 +836,7 @@ class VentanaPrincipal(QMainWindow):
 
     def _al_aplicar_ajustes(self, nueva_configuracion):
         tema_cambio = nueva_configuracion["tema"] != self.configuracion.get("tema")
+        idioma_cambio = nueva_configuracion.get("idioma", "es") != self.configuracion.get("idioma", "es")
         nuevo_intervalo_ms = nueva_configuracion["intervalo_autoactualizacion_seg"] * 1000
 
         self.configuracion = nueva_configuracion
@@ -905,11 +848,50 @@ class VentanaPrincipal(QMainWindow):
         if tema_cambio:
             self._aplicar_tema(self.configuracion["tema"])
 
-        self._fijar_estado("Ajustes guardados correctamente.")
+        if idioma_cambio:
+            idiomas.establecer_idioma(self.configuracion["idioma"])
+            self._retraducir_interfaz()
 
-    # ------------------------------------------------------------------
-    # Cierre de la aplicación
-    # ------------------------------------------------------------------
+        self._fijar_estado(t("estado_ajustes_guardados"))
+
+    def _retraducir_interfaz(self):
+        self.setWindowTitle(t("titulo_app"))
+        QApplication.instance().setApplicationName(t("titulo_app"))
+
+        self.icono_bandeja.setToolTip(t("titulo_app"))
+        self.accion_mostrar_bandeja.setText(t("menu_mostrar_ventana"))
+        self.accion_salir_bandeja.setText(t("menu_salir"))
+
+        self.etiqueta_titulo_app.setText(t("titulo_app"))
+        self.etiqueta_subtitulo_app.setText(t("subtitulo_app"))
+        self.boton_ajustes.setText(t("boton_ajustes"))
+
+        self.etiqueta_encabezado_direcciones.setText(t("encabezado_direcciones"))
+        self.boton_nueva_direccion.setText(t("boton_nueva_direccion"))
+        self.campo_busqueda_direcciones.setPlaceholderText(t("placeholder_buscar_direccion"))
+        self.campo_direccion_actual.setPlaceholderText(t("placeholder_direccion_actual"))
+        self.boton_copiar_direccion.setText(t("boton_copiar"))
+        self.boton_exportar_cuenta.setText(t("boton_exportar"))
+        self.boton_eliminar_direccion.setText(t("boton_eliminar"))
+
+        self.etiqueta_encabezado_bandeja.setText(
+            t("encabezado_historial") if self.viendo_historial else t("encabezado_bandeja_entrada")
+        )
+        self.boton_ver_historial.setText(t("boton_ver_historial"))
+        self.boton_actualizar.setText(t("boton_actualizar"))
+        if not (self.hilo_espera is not None and self.hilo_espera.isRunning()):
+            self.boton_esperar_codigo.setText(t("boton_esperar_mensaje"))
+        self.campo_busqueda_mensajes.setPlaceholderText(t("placeholder_buscar_mensajes"))
+        self.tabla_mensajes.setHorizontalHeaderLabels(
+            [t("columna_remitente"), t("columna_asunto"), t("columna_recibido")]
+        )
+
+        self.etiqueta_vacio_titulo.setText(t("estado_vacio_titulo"))
+        self.etiqueta_vacio_texto.setText(t("estado_vacio_texto"))
+
+        self.etiqueta_codigo_titulo.setText(t("codigo_detectado"))
+        self.boton_copiar_codigo.setText(t("boton_copiar_codigo"))
+
 
     def closeEvent(self, event):
         if self.hilo_espera is not None and self.hilo_espera.isRunning():
@@ -923,8 +905,8 @@ class VentanaPrincipal(QMainWindow):
             event.ignore()
             self.hide()
             self.notificador.notificar(
-                "Gestor de Correo Temporal",
-                "La aplicación sigue activa en la bandeja del sistema.",
+                t("titulo_app"),
+                t("notificacion_app_en_segundo_plano"),
             )
             return
 
@@ -933,8 +915,11 @@ class VentanaPrincipal(QMainWindow):
 
 
 def main():
+    config_inicial = configuracion.cargar_configuracion()
+    idiomas.establecer_idioma(config_inicial.get("idioma", "es"))
+
     aplicacion = QApplication(sys.argv)
-    aplicacion.setApplicationName("Gestor de Correo Temporal")
+    aplicacion.setApplicationName(t("titulo_app"))
     aplicacion.setQuitOnLastWindowClosed(False)
 
     fuente = QFont("Segoe UI", 10)

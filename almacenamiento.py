@@ -1,14 +1,3 @@
-"""
-almacenamiento.py
-
-Gestiona la persistencia local de:
-- las cuentas de correo temporal creadas por el usuario
-- un historial opcional de los mensajes recibidos, indexado por dirección,
-  para poder consultarlos aunque el proveedor los elimine con el tiempo.
-
-Todo se guarda en archivos JSON dentro de la carpeta de usuario.
-"""
-
 import json
 import os
 
@@ -35,10 +24,6 @@ def _escribir_json(ruta, datos):
         json.dump(datos, f, indent=2, ensure_ascii=False)
 
 
-# ----------------------------------------------------------------------
-# Cuentas
-# ----------------------------------------------------------------------
-
 def cargar_cuentas():
     return _leer_json(_ruta(NOMBRE_ARCHIVO_CUENTAS), [])
 
@@ -46,10 +31,6 @@ def cargar_cuentas():
 def guardar_cuentas(cuentas):
     _escribir_json(_ruta(NOMBRE_ARCHIVO_CUENTAS), cuentas)
 
-
-# ----------------------------------------------------------------------
-# Historial de mensajes (por dirección de correo)
-# ----------------------------------------------------------------------
 
 def cargar_historial():
     return _leer_json(_ruta(NOMBRE_ARCHIVO_HISTORIAL), {})
@@ -60,8 +41,6 @@ def guardar_historial(historial):
 
 
 def registrar_mensajes_en_historial(historial, direccion, mensajes_resumen):
-    """Añade al historial los mensajes nuevos de una dirección, sin duplicar
-    los que ya existieran (se identifican por id)."""
     entradas = historial.setdefault(direccion, [])
     ids_existentes = {e["id"] for e in entradas}
 

@@ -10,7 +10,8 @@ de entrada y detectar automáticamente códigos de verificación.
 
 ## 📸 Capturas de pantalla
 
-<img width="1918" height="1078" alt="image" src="https://github.com/user-attachments/assets/5a571647-d894-4833-ae2c-cfe679133fba" />
+<!-- Añade aquí 1-2 imágenes de la app, por ejemplo: -->
+<!-- ![Captura de la interfaz](docs/captura.png) -->
 
 ## ✨ Funcionalidades
 
@@ -39,7 +40,7 @@ pip install -r requirements.txt
 ## ▶️ Uso
 
 ```bash
-pythonw main.py
+python main.py
 ```
 
 ## 📁 Estructura del proyecto

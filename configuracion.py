@@ -1,19 +1,12 @@
-"""
-configuracion.py
-
-Gestiona los ajustes del usuario: tema visual, proveedor preferido,
-intervalos de tiempo, notificaciones y patrón de detección de código.
-Se guardan en un JSON independiente del historial de cuentas.
-"""
-
 import json
 import os
 
 NOMBRE_ARCHIVO_CONFIG = ".correo_temporal_config.json"
 
 VALORES_DEFECTO = {
-    "tema": "claro",                       # "claro" | "oscuro"
-    "proveedor_preferido": "auto",          # "auto" | "mail_tm" | "guerrilla_mail"
+    "tema": "claro",
+    "idioma": "es",
+    "proveedor_preferido": "auto",
     "notificaciones_activas": True,
     "minimizar_a_bandeja": True,
     "intervalo_autoactualizacion_seg": 15,

@@ -1,12 +1,3 @@
-"""
-tareas.py
-
-Objetos QThread que ejecutan las operaciones de red a través del gestor de
-proveedores, sin bloquear el hilo principal de la interfaz. Cada tarea
-emite señales Qt con el resultado o el error para que la ventana los
-consuma de forma segura desde el hilo de la interfaz.
-"""
-
 import time
 
 from PySide6.QtCore import QThread, Signal
@@ -15,7 +6,7 @@ from proveedores.base import ErrorProveedor
 
 
 class TareaCrearCuenta(QThread):
-    exito = Signal(dict, str)   # cuenta, identificador de proveedor usado
+    exito = Signal(dict, str)
     error = Signal(str)
 
     def __init__(self, gestor_proveedores, preferencia, parent=None):
@@ -35,7 +26,7 @@ class TareaCrearCuenta(QThread):
 
 
 class TareaListarMensajes(QThread):
-    exito = Signal(list)   # lista de MensajeResumen
+    exito = Signal(list)
     error = Signal(str)
 
     def __init__(self, gestor_proveedores, cuenta, parent=None):
@@ -56,7 +47,7 @@ class TareaListarMensajes(QThread):
 
 
 class TareaObtenerMensaje(QThread):
-    exito = Signal(object)   # MensajeCompleto
+    exito = Signal(object)
     error = Signal(str)
 
     def __init__(self, gestor_proveedores, cuenta, id_mensaje, parent=None):
@@ -77,10 +68,8 @@ class TareaObtenerMensaje(QThread):
 
 
 class TareaEsperarMensajeNuevo(QThread):
-    """Sondea la bandeja de entrada hasta que llega un mensaje no visto antes
-    o se agota el tiempo máximo de espera."""
 
-    exito = Signal(list, object)   # lista completa de resúmenes, nuevo (o None)
+    exito = Signal(list, object)
     error = Signal(str)
 
     def __init__(

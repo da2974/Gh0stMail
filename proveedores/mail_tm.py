@@ -1,10 +1,3 @@
-"""
-proveedores/mail_tm.py
-
-Implementación del proveedor mail.tm sobre la interfaz común
-ProveedorCorreoTemporal.
-"""
-
 import random
 import string
 
