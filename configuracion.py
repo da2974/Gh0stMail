@@ -14,6 +14,8 @@ VALORES_DEFECTO = {
     "duracion_maxima_espera_min": 2,
     "patron_codigo_personalizado": "",
     "guardar_historial_mensajes": True,
+    "auto_copiar_codigo": False,
+    "sonido_activo": True,
 }
 
 

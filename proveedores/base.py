@@ -45,6 +45,12 @@ class ProveedorCorreoTemporal(ABC):
     nombre_visible = "Proveedor"
     identificador = "base"
 
+    # Duración estimada, en minutos, antes de que el proveedor suela
+    # descartar una dirección inactiva. None = desconocida / sin límite
+    # publicado. Es SIEMPRE aproximada: los proveedores gratuitos no la
+    # garantizan y pueden cambiarla sin aviso.
+    duracion_estimada_min = None
+
     @abstractmethod
     def crear_cuenta(self):
         pass

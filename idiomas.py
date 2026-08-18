@@ -415,6 +415,22 @@ _TEXTOS = {
         "es": "Conserva una copia local de los correos recibidos por cada dirección.",
         "en": "Keeps a local copy of received emails for each address.",
     },
+    "ajuste_auto_copiar_titulo": {
+        "es": "Copiar el código automáticamente",
+        "en": "Automatically copy the code",
+    },
+    "ajuste_auto_copiar_descripcion": {
+        "es": "En cuanto se detecte un código de verificación, se copia solo al portapapeles.",
+        "en": "As soon as a verification code is detected, it's copied to the clipboard automatically.",
+    },
+    "ajuste_sonido_titulo": {
+        "es": "Sonido de aviso",
+        "en": "Alert sound",
+    },
+    "ajuste_sonido_descripcion": {
+        "es": "Reproduce un aviso sonoro cuando llega un mensaje nuevo.",
+        "en": "Plays an alert sound when a new message arrives.",
+    },
     "ajuste_autoactualizacion_titulo": {
         "es": "Intervalo de autoactualización",
         "en": "Auto-refresh interval",
@@ -468,6 +484,27 @@ _TEXTOS = {
     "error_regex_invalida": {
         "es": "Esa expresión regular no es válida. Corrígela o déjala en blanco.",
         "en": "That regular expression is not valid. Fix it or leave it blank.",
+    },
+
+    "titulo_advertencia_almacenamiento": {
+        "es": "Aviso sobre datos guardados",
+        "en": "Notice about saved data",
+    },
+    "caducidad_desconocida": {
+        "es": "sin caducidad conocida",
+        "en": "no known expiration",
+    },
+    "caducidad_restante": {
+        "es": "≈{min} min restantes (estimado)",
+        "en": "≈{min} min left (estimated)",
+    },
+    "caducidad_expirada": {
+        "es": "puede haber caducado",
+        "en": "may have expired",
+    },
+    "estado_codigo_copiado_auto": {
+        "es": "Código detectado y copiado automáticamente al portapapeles.",
+        "en": "Code detected and automatically copied to the clipboard.",
     },
 }
 

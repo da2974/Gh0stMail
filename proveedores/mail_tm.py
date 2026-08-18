@@ -3,6 +3,7 @@ import string
 
 import requests
 
+import utilidades
 from .base import (
     ProveedorCorreoTemporal,
     ErrorProveedor,
@@ -21,6 +22,10 @@ def _generar_cadena(longitud, alfabeto):
 class ProveedorMailTM(ProveedorCorreoTemporal):
     nombre_visible = "mail.tm"
     identificador = "mail_tm"
+    # mail.tm no publica una caducidad fija para sus cuentas; en la
+    # práctica pueden persistir bastante tiempo. Se deja sin estimar
+    # para no mostrar una cuenta atrás falsa.
+    duracion_estimada_min = None
 
     def __init__(self):
         self.session = requests.Session()
@@ -126,7 +131,9 @@ class ProveedorMailTM(ProveedorCorreoTemporal):
         cuerpo = m.get("text")
         if not cuerpo:
             partes_html = m.get("html") or []
-            cuerpo = "\n".join(partes_html)
+            cuerpo = utilidades.html_a_texto("\n".join(partes_html))
+        elif utilidades.parece_html(cuerpo):
+            cuerpo = utilidades.html_a_texto(cuerpo)
 
         return MensajeCompleto(
             id_mensaje=m["id"],

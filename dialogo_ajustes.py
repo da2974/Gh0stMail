@@ -149,6 +149,22 @@ class DialogoAjustes(QDialog):
             t("ajuste_guardar_historial_descripcion"),
             self.casilla_guardar_historial,
         ))
+        layout.addWidget(_separador())
+
+        self.casilla_auto_copiar = QCheckBox(t("activado"))
+        layout.addWidget(_fila_ajuste(
+            t("ajuste_auto_copiar_titulo"),
+            t("ajuste_auto_copiar_descripcion"),
+            self.casilla_auto_copiar,
+        ))
+        layout.addWidget(_separador())
+
+        self.casilla_sonido = QCheckBox(t("activado"))
+        layout.addWidget(_fila_ajuste(
+            t("ajuste_sonido_titulo"),
+            t("ajuste_sonido_descripcion"),
+            self.casilla_sonido,
+        ))
 
         layout.addStretch()
         return pagina
@@ -234,6 +250,8 @@ class DialogoAjustes(QDialog):
         self.casilla_notificaciones.setChecked(bool(c.get("notificaciones_activas", True)))
         self.casilla_minimizar_bandeja.setChecked(bool(c.get("minimizar_a_bandeja", True)))
         self.casilla_guardar_historial.setChecked(bool(c.get("guardar_historial_mensajes", True)))
+        self.casilla_auto_copiar.setChecked(bool(c.get("auto_copiar_codigo", False)))
+        self.casilla_sonido.setChecked(bool(c.get("sonido_activo", True)))
 
         self.spin_autoactualizacion.setValue(int(c.get("intervalo_autoactualizacion_seg", 15)))
         self.spin_intervalo_espera.setValue(int(c.get("intervalo_espera_activa_seg", 5)))
@@ -254,6 +272,8 @@ class DialogoAjustes(QDialog):
             "notificaciones_activas": self.casilla_notificaciones.isChecked(),
             "minimizar_a_bandeja": self.casilla_minimizar_bandeja.isChecked(),
             "guardar_historial_mensajes": self.casilla_guardar_historial.isChecked(),
+            "auto_copiar_codigo": self.casilla_auto_copiar.isChecked(),
+            "sonido_activo": self.casilla_sonido.isChecked(),
             "intervalo_autoactualizacion_seg": self.spin_autoactualizacion.value(),
             "intervalo_espera_activa_seg": self.spin_intervalo_espera.value(),
             "duracion_maxima_espera_min": self.spin_tiempo_maximo_espera.value(),

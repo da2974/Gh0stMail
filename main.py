@@ -50,6 +50,7 @@ DIRECTORIO_APP = os.path.dirname(os.path.abspath(__file__))
 NOMBRES_PROVEEDOR_VISIBLE = {
     "mail_tm": "mail.tm",
     "guerrilla_mail": "Guerrilla Mail",
+    "one_sec_mail": "1secMail",
 }
 
 
@@ -76,14 +77,29 @@ def _construir_icono_aplicacion():
 
 
 class ItemDireccion(QListWidgetItem):
-    def __init__(self, cuenta):
-        nombre_proveedor = NOMBRES_PROVEEDOR_VISIBLE.get(
-            cuenta.get("proveedor", ""), cuenta.get("proveedor", "")
-        )
-        etiqueta = f"{cuenta['address']}\n{cuenta.get('creado', '')}  ·  {nombre_proveedor}"
-        super().__init__(etiqueta)
+    def __init__(self, cuenta, duracion_estimada_min=None):
         self.cuenta = cuenta
+        self.duracion_estimada_min = duracion_estimada_min
+        super().__init__("")
         self.setSizeHint(QSize(0, 58))
+        self.actualizar_texto()
+
+    def actualizar_texto(self):
+        nombre_proveedor = NOMBRES_PROVEEDOR_VISIBLE.get(
+            self.cuenta.get("proveedor", ""), self.cuenta.get("proveedor", "")
+        )
+        etiqueta = f"{self.cuenta['address']}\n{self.cuenta.get('creado', '')}  ·  {nombre_proveedor}"
+
+        restante = utilidades.minutos_restantes_caducidad(
+            self.cuenta.get("creado_iso"), self.duracion_estimada_min
+        )
+        if restante is not None:
+            if restante <= 0:
+                etiqueta += f"  ·  {t('caducidad_expirada')}"
+            else:
+                etiqueta += f"  ·  {t('caducidad_restante', min=restante)}"
+
+        self.setText(etiqueta)
 
 
 class VentanaPrincipal(QMainWindow):
@@ -107,6 +123,10 @@ class VentanaPrincipal(QMainWindow):
         self.hilo_espera = None
         self._hilo_autoactualizacion = None
         self._salir_solicitado = False
+        # Referencias fuertes a todos los QThread en curso, para evitar
+        # que Python los recolecte (y Qt aborte) si se reasigna
+        # hilo_activo/hilo_espera antes de que el hilo anterior termine.
+        self._hilos_en_vuelo = []
 
         self._icono_app = _construir_icono_aplicacion()
         self.setWindowIcon(self._icono_app)
@@ -114,14 +134,20 @@ class VentanaPrincipal(QMainWindow):
         self._construir_bandeja_sistema()
         self.notificador = GestorNotificaciones(self.icono_bandeja)
         self.notificador.establecer_activas(self.configuracion["notificaciones_activas"])
+        self.notificador.establecer_sonido_activo(self.configuracion.get("sonido_activo", True))
 
         self._construir_interfaz()
         self._aplicar_tema(self.configuracion["tema"])
         self._poblar_lista_cuentas()
+        self._avisar_si_hubo_problemas_de_almacenamiento()
 
         self.temporizador = QTimer(self)
         self.temporizador.timeout.connect(self._autoactualizar_silencioso)
         self.temporizador.start(self.configuracion["intervalo_autoactualizacion_seg"] * 1000)
+
+        self.temporizador_caducidad = QTimer(self)
+        self.temporizador_caducidad.timeout.connect(self._actualizar_etiquetas_caducidad)
+        self.temporizador_caducidad.start(60000)
 
 
     def _construir_bandeja_sistema(self):
@@ -409,6 +435,36 @@ class VentanaPrincipal(QMainWindow):
     def _fijar_estado(self, mensaje, tiempo_ms=5000):
         self.barra_estado.showMessage(mensaje, tiempo_ms)
 
+    def _lanzar_hilo(self, hilo, callback_exito=None, callback_error=None):
+        """Inicia un QThread manteniendo una referencia fuerte hasta que
+        termina, para evitar que se destruya mientras sigue corriendo si
+        hilo_activo/hilo_espera se reasignan antes de que acabe."""
+        if callback_exito is not None:
+            hilo.exito.connect(callback_exito)
+        if callback_error is not None:
+            hilo.error.connect(callback_error)
+        hilo.finished.connect(lambda h=hilo: self._limpiar_hilo(h))
+        self._hilos_en_vuelo.append(hilo)
+        hilo.start()
+        return hilo
+
+    def _limpiar_hilo(self, hilo):
+        if hilo in self._hilos_en_vuelo:
+            self._hilos_en_vuelo.remove(hilo)
+        hilo.deleteLater()
+
+    def _avisar_si_hubo_problemas_de_almacenamiento(self):
+        if not almacenamiento.advertencias_carga:
+            return
+        detalle = "\n\n".join(almacenamiento.advertencias_carga)
+        QMessageBox.warning(self, t("titulo_advertencia_almacenamiento"), detalle)
+        almacenamiento.advertencias_carga.clear()
+
+    def _actualizar_etiquetas_caducidad(self):
+        for i in range(self.lista_direcciones.count()):
+            item = self.lista_direcciones.item(i)
+            item.actualizar_texto()
+
     def _cuenta_actual(self):
         item = self.lista_direcciones.currentItem()
         if item is None:
@@ -447,7 +503,8 @@ class VentanaPrincipal(QMainWindow):
         self.lista_direcciones.blockSignals(True)
         self.lista_direcciones.clear()
         for cuenta in self.cuentas:
-            self.lista_direcciones.addItem(ItemDireccion(cuenta))
+            duracion = self.gestor_proveedores.duracion_estimada_min(cuenta.get("proveedor"))
+            self.lista_direcciones.addItem(ItemDireccion(cuenta, duracion))
         self.lista_direcciones.blockSignals(False)
 
     def _al_seleccionar_cuenta(self, actual, _anterior):
@@ -472,18 +529,21 @@ class VentanaPrincipal(QMainWindow):
         self._fijar_estado(t("estado_creando_direccion"))
 
         preferencia = self.configuracion.get("proveedor_preferido", "auto")
-        self.hilo_activo = TareaCrearCuenta(self.gestor_proveedores, preferencia)
-        self.hilo_activo.exito.connect(self._al_crear_cuenta_exito)
-        self.hilo_activo.error.connect(self._al_crear_cuenta_error)
-        self.hilo_activo.start()
+        self.hilo_activo = self._lanzar_hilo(
+            TareaCrearCuenta(self.gestor_proveedores, preferencia),
+            self._al_crear_cuenta_exito,
+            self._al_crear_cuenta_error,
+        )
 
     def _al_crear_cuenta_exito(self, datos_cuenta, identificador_proveedor):
         datos_cuenta["proveedor"] = identificador_proveedor
         datos_cuenta["creado"] = utilidades.marca_de_tiempo_actual()
+        datos_cuenta["creado_iso"] = utilidades.marca_de_tiempo_iso_actual()
         self.cuentas.append(datos_cuenta)
         almacenamiento.guardar_cuentas(self.cuentas)
 
-        item = ItemDireccion(datos_cuenta)
+        duracion = self.gestor_proveedores.duracion_estimada_min(identificador_proveedor)
+        item = ItemDireccion(datos_cuenta, duracion)
         self.lista_direcciones.addItem(item)
         self.lista_direcciones.setCurrentItem(item)
 
@@ -585,10 +645,11 @@ class VentanaPrincipal(QMainWindow):
         self._fijar_estado(t("estado_consultando_bandeja"))
         self.boton_actualizar.setEnabled(False)
 
-        self.hilo_activo = TareaListarMensajes(self.gestor_proveedores, cuenta)
-        self.hilo_activo.exito.connect(self._al_listar_mensajes_exito)
-        self.hilo_activo.error.connect(self._al_listar_mensajes_error)
-        self.hilo_activo.start()
+        self.hilo_activo = self._lanzar_hilo(
+            TareaListarMensajes(self.gestor_proveedores, cuenta),
+            self._al_listar_mensajes_exito,
+            self._al_listar_mensajes_error,
+        )
 
     def _al_listar_mensajes_exito(self, mensajes):
         self.boton_actualizar.setEnabled(True)
@@ -654,10 +715,11 @@ class VentanaPrincipal(QMainWindow):
 
         self._fijar_estado(t("estado_cargando_mensaje"))
 
-        self.hilo_activo = TareaObtenerMensaje(self.gestor_proveedores, cuenta, mensaje_resumen.id)
-        self.hilo_activo.exito.connect(self._al_obtener_mensaje_exito)
-        self.hilo_activo.error.connect(self._al_obtener_mensaje_error)
-        self.hilo_activo.start()
+        self.hilo_activo = self._lanzar_hilo(
+            TareaObtenerMensaje(self.gestor_proveedores, cuenta, mensaje_resumen.id),
+            self._al_obtener_mensaje_exito,
+            self._al_obtener_mensaje_error,
+        )
 
     def _al_obtener_mensaje_exito(self, mensaje_completo):
         self.texto_cuerpo.setPlainText(mensaje_completo.cuerpo_texto.strip())
@@ -678,9 +740,14 @@ class VentanaPrincipal(QMainWindow):
             self._ocultar_codigo()
 
     def _mostrar_codigo(self, codigo):
+        es_codigo_nuevo = codigo != self.codigo_actual
         self.codigo_actual = codigo
         self.etiqueta_valor_codigo.setText(codigo)
         self.tarjeta_codigo.show()
+
+        if es_codigo_nuevo and self.configuracion.get("auto_copiar_codigo", False):
+            QApplication.clipboard().setText(codigo)
+            self._fijar_estado(t("estado_codigo_copiado_auto"))
 
     def _ocultar_codigo(self):
         self.codigo_actual = None
@@ -690,7 +757,7 @@ class VentanaPrincipal(QMainWindow):
         if not self.codigo_actual:
             return
         QApplication.clipboard().setText(self.codigo_actual)
-        self._fijar_estado("Código copiado al portapapeles.")
+        self._fijar_estado(t("estado_codigo_copiado"))
 
 
     def _alternar_vista_historial(self, activo):
@@ -751,12 +818,13 @@ class VentanaPrincipal(QMainWindow):
         intervalo = self.configuracion.get("intervalo_espera_activa_seg", 5)
         tiempo_maximo = self.configuracion.get("duracion_maxima_espera_min", 2) * 60
 
-        self.hilo_espera = TareaEsperarMensajeNuevo(
-            self.gestor_proveedores, cuenta, ids_conocidos, intervalo, tiempo_maximo
+        self.hilo_espera = self._lanzar_hilo(
+            TareaEsperarMensajeNuevo(
+                self.gestor_proveedores, cuenta, ids_conocidos, intervalo, tiempo_maximo
+            ),
+            self._al_esperar_codigo_exito,
+            self._al_esperar_codigo_error,
         )
-        self.hilo_espera.exito.connect(self._al_esperar_codigo_exito)
-        self.hilo_espera.error.connect(self._al_esperar_codigo_error)
-        self.hilo_espera.start()
 
     def _al_esperar_codigo_exito(self, mensajes, nuevo):
         self.boton_esperar_codigo.setEnabled(True)
@@ -796,11 +864,17 @@ class VentanaPrincipal(QMainWindow):
         if self.hilo_espera is not None and self.hilo_espera.isRunning():
             return
 
-        hilo = TareaListarMensajes(self.gestor_proveedores, cuenta)
-        hilo.exito.connect(self._al_autoactualizar_exito)
-        hilo.error.connect(lambda _m: None)
-        hilo.start()
-        self._hilo_autoactualizacion = hilo
+        self._hilo_autoactualizacion = self._lanzar_hilo(
+            TareaListarMensajes(self.gestor_proveedores, cuenta),
+            self._al_autoactualizar_exito,
+            self._al_autoactualizar_error,
+        )
+
+    def _al_autoactualizar_error(self, mensaje):
+        # No se muestra un diálogo (esto corre en segundo plano cada
+        # pocos segundos y sería intrusivo), pero al menos queda
+        # reflejado en la barra de estado en vez de perderse en silencio.
+        self._fijar_estado(t("estado_no_se_pudo_actualizar_bandeja"), 4000)
 
     def _al_autoactualizar_exito(self, mensajes):
         ids_antes = {m.id for m in self.mensajes_actuales}
@@ -843,6 +917,7 @@ class VentanaPrincipal(QMainWindow):
         configuracion.guardar_configuracion(self.configuracion)
 
         self.notificador.establecer_activas(self.configuracion["notificaciones_activas"])
+        self.notificador.establecer_sonido_activo(self.configuracion.get("sonido_activo", True))
         self.temporizador.setInterval(nuevo_intervalo_ms)
 
         if tema_cambio:
@@ -892,6 +967,8 @@ class VentanaPrincipal(QMainWindow):
         self.etiqueta_codigo_titulo.setText(t("codigo_detectado"))
         self.boton_copiar_codigo.setText(t("boton_copiar_codigo"))
 
+        self._actualizar_etiquetas_caducidad()
+
 
     def closeEvent(self, event):
         if self.hilo_espera is not None and self.hilo_espera.isRunning():
@@ -899,6 +976,14 @@ class VentanaPrincipal(QMainWindow):
             self.hilo_espera.wait(1000)
 
         minimizar_a_bandeja = self.configuracion.get("minimizar_a_bandeja", True)
+        soporta_bandeja_previo = QSystemTrayIcon.isSystemTrayAvailable()
+        if not (minimizar_a_bandeja and soporta_bandeja_previo and not self._salir_solicitado):
+            # Solo al cerrar de verdad (no al minimizar a la bandeja):
+            # dar un margen breve a los hilos aún en vuelo para que
+            # terminen solos antes de que la app destruya sus objetos.
+            for hilo in list(self._hilos_en_vuelo):
+                if hilo.isRunning():
+                    hilo.wait(500)
         soporta_bandeja = QSystemTrayIcon.isSystemTrayAvailable()
 
         if minimizar_a_bandeja and soporta_bandeja and not self._salir_solicitado:

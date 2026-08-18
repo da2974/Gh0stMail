@@ -1,6 +1,7 @@
 from proveedores.base import ErrorProveedor
 from proveedores.mail_tm import ProveedorMailTM
 from proveedores.guerrilla_mail import ProveedorGuerrillaMail
+from proveedores.one_sec_mail import ProveedorOneSecMail
 
 
 class GestorProveedores:
@@ -8,8 +9,15 @@ class GestorProveedores:
         self._proveedores = {
             "mail_tm": ProveedorMailTM(),
             "guerrilla_mail": ProveedorGuerrillaMail(),
+            "one_sec_mail": ProveedorOneSecMail(),
         }
-        self._orden_auto = ["mail_tm", "guerrilla_mail"]
+        self._orden_auto = ["mail_tm", "guerrilla_mail", "one_sec_mail"]
+
+    def duracion_estimada_min(self, identificador):
+        proveedor = self._proveedores.get(identificador)
+        if proveedor is None:
+            return None
+        return proveedor.duracion_estimada_min
 
     def proveedores_disponibles(self):
         return [(pid, p.nombre_visible) for pid, p in self._proveedores.items()]
