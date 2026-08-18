@@ -1,284 +1,184 @@
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (
-    QDialog,
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QComboBox,
-    QCheckBox,
-    QSpinBox,
-    QPushButton,
-    QFrame,
-    QTabWidget,
-)
+import json
+import os
+import stat
+import time
 
-import utilities
-import languages
-from languages import t
+try:
+    from cryptography.fernet import Fernet, InvalidToken
+    _CIFRADO_DISPONIBLE = True
+except ImportError:
+    _CIFRADO_DISPONIBLE = False
 
+NOMBRE_ARCHIVO_CUENTAS = ".correo_temporal_cuentas.json"
+NOMBRE_ARCHIVO_HISTORIAL = ".correo_temporal_historial.json"
+NOMBRE_ARCHIVO_CLAVE = ".correo_temporal_clave.key"
 
-def _fila_ajuste(titulo, descripcion, widget_control):
-    contenedor = QFrame()
-    layout = QHBoxLayout(contenedor)
-    layout.setContentsMargins(0, 10, 0, 10)
-
-    bloque_texto = QVBoxLayout()
-    bloque_texto.setSpacing(2)
-    etiqueta_titulo = QLabel(titulo)
-    etiqueta_titulo.setObjectName("etiquetaAjusteTitulo")
-    bloque_texto.addWidget(etiqueta_titulo)
-
-    if descripcion:
-        etiqueta_descripcion = QLabel(descripcion)
-        etiqueta_descripcion.setObjectName("etiquetaAjusteDescripcion")
-        etiqueta_descripcion.setWordWrap(True)
-        bloque_texto.addWidget(etiqueta_descripcion)
-
-    layout.addLayout(bloque_texto, stretch=1)
-    layout.addWidget(widget_control, alignment=Qt.AlignVCenter)
-
-    return contenedor
+# Mensajes de advertencia acumulados durante la carga (p.ej. archivos
+# corruptos que tuvieron que restaurarse a un estado vacío). main.py los
+# consulta una vez al arrancar para avisar al usuario en vez de perder
+# datos en silencio.
+advertencias_carga = []
 
 
-def _separador():
-    linea = QFrame()
-    linea.setObjectName("separadorAjustes")
-    linea.setFrameShape(QFrame.HLine)
-    return linea
+def _ruta(nombre_archivo):
+    return os.path.join(os.path.expanduser("~"), nombre_archivo)
 
 
-class DialogoAjustes(QDialog):
+def _obtener_o_crear_clave():
+    """Clave local para cifrar el archivo de cuentas en reposo.
 
-    ajustes_aplicados = Signal(dict)
+    Aviso honesto sobre el alcance de esta protección: la clave se
+    guarda en el mismo equipo, en un archivo con permisos restringidos
+    (solo lectura/escritura para el propietario en sistemas POSIX). Esto
+    protege contra la lectura casual del archivo de cuentas (por ejemplo,
+    otro usuario del mismo equipo, una copia de seguridad no cifrada
+    compartida por error, o un vistazo rápido al contenido) pero NO
+    protege frente a alguien con acceso completo a tu cuenta de usuario
+    en este equipo, que podría leer también la clave.
+    """
+    if not _CIFRADO_DISPONIBLE:
+        return None
 
-    def __init__(self, configuracion_actual, proveedores_disponibles, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(t("titulo_dialogo_ajustes"))
-        self.setMinimumWidth(480)
-        self.setModal(True)
+    ruta_clave = _ruta(NOMBRE_ARCHIVO_CLAVE)
+    if os.path.exists(ruta_clave):
+        try:
+            with open(ruta_clave, "rb") as f:
+                return f.read().strip()
+        except OSError:
+            return None
 
-        self._configuracion = dict(configuracion_actual)
-        self._proveedores_disponibles = proveedores_disponibles
-
-        self._construir_interfaz()
-        self._cargar_valores_actuales()
-
-
-    def _construir_interfaz(self):
-        layout_raiz = QVBoxLayout(self)
-        layout_raiz.setContentsMargins(20, 20, 20, 16)
-        layout_raiz.setSpacing(14)
-
-        pestañas = QTabWidget()
-        pestañas.addTab(self._crear_pestana_general(), t("pestana_general"))
-        pestañas.addTab(self._crear_pestana_tiempos(), t("pestana_tiempos"))
-        pestañas.addTab(self._crear_pestana_avanzado(), t("pestana_avanzado"))
-        layout_raiz.addWidget(pestañas, stretch=1)
-
-        fila_botones = QHBoxLayout()
-        fila_botones.addStretch()
-
-        boton_cancelar = QPushButton(t("boton_cancelar"))
-        boton_cancelar.setObjectName("botonSecundario")
-        boton_cancelar.setCursor(Qt.PointingHandCursor)
-        boton_cancelar.clicked.connect(self.reject)
-
-        boton_guardar = QPushButton(t("boton_guardar_cambios"))
-        boton_guardar.setObjectName("botonPrimario")
-        boton_guardar.setCursor(Qt.PointingHandCursor)
-        boton_guardar.clicked.connect(self._guardar)
-
-        fila_botones.addWidget(boton_cancelar)
-        fila_botones.addWidget(boton_guardar)
-        layout_raiz.addLayout(fila_botones)
-
-    def _crear_pestana_general(self):
-        pagina = QWidget()
-        layout = QVBoxLayout(pagina)
-        layout.setContentsMargins(4, 12, 4, 4)
-        layout.setSpacing(0)
-
-        self.combo_idioma = QComboBox()
-        for codigo, nombre_visible in languages.IDIOMAS_DISPONIBLES:
-            self.combo_idioma.addItem(nombre_visible, userData=codigo)
-        layout.addWidget(_fila_ajuste(
-            t("ajuste_idioma_titulo"), t("ajuste_idioma_descripcion"), self.combo_idioma
-        ))
-        layout.addWidget(_separador())
-
-        self.combo_tema = QComboBox()
-        self.combo_tema.addItem(t("tema_claro"), userData="claro")
-        self.combo_tema.addItem(t("tema_oscuro"), userData="oscuro")
-        layout.addWidget(_fila_ajuste(
-            t("ajuste_tema_titulo"), t("ajuste_tema_descripcion"), self.combo_tema
-        ))
-        layout.addWidget(_separador())
-
-        self.combo_proveedor = QComboBox()
-        self.combo_proveedor.addItem(t("proveedor_automatico"), userData="auto")
-        for identificador, nombre in self._proveedores_disponibles:
-            self.combo_proveedor.addItem(nombre, userData=identificador)
-        layout.addWidget(_fila_ajuste(
-            t("ajuste_proveedor_titulo"),
-            t("ajuste_proveedor_descripcion"),
-            self.combo_proveedor,
-        ))
-        layout.addWidget(_separador())
-
-        self.casilla_notificaciones = QCheckBox(t("activadas"))
-        layout.addWidget(_fila_ajuste(
-            t("ajuste_notificaciones_titulo"),
-            t("ajuste_notificaciones_descripcion"),
-            self.casilla_notificaciones,
-        ))
-        layout.addWidget(_separador())
-
-        self.casilla_minimizar_bandeja = QCheckBox(t("activado"))
-        layout.addWidget(_fila_ajuste(
-            t("ajuste_minimizar_bandeja_titulo"),
-            t("ajuste_minimizar_bandeja_descripcion"),
-            self.casilla_minimizar_bandeja,
-        ))
-        layout.addWidget(_separador())
-
-        self.casilla_guardar_historial = QCheckBox(t("activado"))
-        layout.addWidget(_fila_ajuste(
-            t("ajuste_guardar_historial_titulo"),
-            t("ajuste_guardar_historial_descripcion"),
-            self.casilla_guardar_historial,
-        ))
-        layout.addWidget(_separador())
-
-        self.casilla_auto_copiar = QCheckBox(t("activado"))
-        layout.addWidget(_fila_ajuste(
-            t("ajuste_auto_copiar_titulo"),
-            t("ajuste_auto_copiar_descripcion"),
-            self.casilla_auto_copiar,
-        ))
-        layout.addWidget(_separador())
-
-        self.casilla_sonido = QCheckBox(t("activado"))
-        layout.addWidget(_fila_ajuste(
-            t("ajuste_sonido_titulo"),
-            t("ajuste_sonido_descripcion"),
-            self.casilla_sonido,
-        ))
-
-        layout.addStretch()
-        return pagina
-
-    def _crear_pestana_tiempos(self):
-        pagina = QWidget()
-        layout = QVBoxLayout(pagina)
-        layout.setContentsMargins(4, 12, 4, 4)
-        layout.setSpacing(0)
-
-        self.spin_autoactualizacion = QSpinBox()
-        self.spin_autoactualizacion.setRange(5, 300)
-        self.spin_autoactualizacion.setSuffix(" s")
-        layout.addWidget(_fila_ajuste(
-            t("ajuste_autoactualizacion_titulo"),
-            t("ajuste_autoactualizacion_descripcion"),
-            self.spin_autoactualizacion,
-        ))
-        layout.addWidget(_separador())
-
-        self.spin_intervalo_espera = QSpinBox()
-        self.spin_intervalo_espera.setRange(2, 60)
-        self.spin_intervalo_espera.setSuffix(" s")
-        layout.addWidget(_fila_ajuste(
-            t("ajuste_frecuencia_espera_titulo"),
-            t("ajuste_frecuencia_espera_descripcion"),
-            self.spin_intervalo_espera,
-        ))
-        layout.addWidget(_separador())
-
-        self.spin_tiempo_maximo_espera = QSpinBox()
-        self.spin_tiempo_maximo_espera.setRange(1, 30)
-        self.spin_tiempo_maximo_espera.setSuffix(" min")
-        layout.addWidget(_fila_ajuste(
-            t("ajuste_tiempo_maximo_titulo"),
-            t("ajuste_tiempo_maximo_descripcion"),
-            self.spin_tiempo_maximo_espera,
-        ))
-
-        layout.addStretch()
-        return pagina
-
-    def _crear_pestana_avanzado(self):
-        pagina = QWidget()
-        layout = QVBoxLayout(pagina)
-        layout.setContentsMargins(4, 12, 4, 4)
-        layout.setSpacing(10)
-
-        etiqueta_titulo = QLabel(t("ajuste_patron_titulo"))
-        etiqueta_titulo.setObjectName("etiquetaAjusteTitulo")
-        layout.addWidget(etiqueta_titulo)
-
-        etiqueta_descripcion = QLabel(t("ajuste_patron_descripcion"))
-        etiqueta_descripcion.setObjectName("etiquetaAjusteDescripcion")
-        etiqueta_descripcion.setWordWrap(True)
-        layout.addWidget(etiqueta_descripcion)
-
-        self.campo_patron_regex = QLineEdit()
-        self.campo_patron_regex.setPlaceholderText(t("ajuste_patron_placeholder"))
-        layout.addWidget(self.campo_patron_regex)
-
-        self.etiqueta_error_regex = QLabel("")
-        self.etiqueta_error_regex.setObjectName("etiquetaAjusteDescripcion")
-        self.etiqueta_error_regex.setStyleSheet("color: #C82333;")
-        layout.addWidget(self.etiqueta_error_regex)
-
-        layout.addStretch()
-        return pagina
+    clave = Fernet.generate_key()
+    try:
+        with open(ruta_clave, "wb") as f:
+            f.write(clave)
+        try:
+            os.chmod(ruta_clave, stat.S_IRUSR | stat.S_IWUSR)
+        except OSError:
+            pass  # No disponible en todas las plataformas (p.ej. Windows/FAT).
+    except OSError:
+        return None
+    return clave
 
 
-    def _cargar_valores_actuales(self):
-        c = self._configuracion
+def _respaldar_archivo_corrupto(ruta):
+    try:
+        destino = f"{ruta}.corrupto-{int(time.time())}.bak"
+        os.replace(ruta, destino)
+        return destino
+    except OSError:
+        return None
 
-        idx_idioma = self.combo_idioma.findData(c.get("idioma", "es"))
-        self.combo_idioma.setCurrentIndex(max(0, idx_idioma))
 
-        idx_tema = self.combo_tema.findData(c.get("tema", "claro"))
-        self.combo_tema.setCurrentIndex(max(0, idx_tema))
+def _leer_json(ruta, valor_por_defecto):
+    if not os.path.exists(ruta):
+        return valor_por_defecto
+    try:
+        with open(ruta, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        destino = _respaldar_archivo_corrupto(ruta)
+        if destino:
+            advertencias_carga.append(
+                f"El archivo {os.path.basename(ruta)} estaba dañado y se "
+                f"restauró vacío. Se guardó una copia en {destino} por si "
+                "quieres intentar recuperar algo manualmente."
+            )
+        else:
+            advertencias_carga.append(
+                f"El archivo {os.path.basename(ruta)} estaba dañado y no se "
+                "pudo leer; se restauró vacío."
+            )
+        return valor_por_defecto
 
-        idx_proveedor = self.combo_proveedor.findData(c.get("proveedor_preferido", "auto"))
-        self.combo_proveedor.setCurrentIndex(max(0, idx_proveedor))
 
-        self.casilla_notificaciones.setChecked(bool(c.get("notificaciones_activas", True)))
-        self.casilla_minimizar_bandeja.setChecked(bool(c.get("minimizar_a_bandeja", True)))
-        self.casilla_guardar_historial.setChecked(bool(c.get("guardar_historial_mensajes", True)))
-        self.casilla_auto_copiar.setChecked(bool(c.get("auto_copiar_codigo", False)))
-        self.casilla_sonido.setChecked(bool(c.get("sonido_activo", True)))
+def _escribir_json(ruta, datos):
+    with open(ruta, "w", encoding="utf-8") as f:
+        json.dump(datos, f, indent=2, ensure_ascii=False)
 
-        self.spin_autoactualizacion.setValue(int(c.get("intervalo_autoactualizacion_seg", 15)))
-        self.spin_intervalo_espera.setValue(int(c.get("intervalo_espera_activa_seg", 5)))
-        self.spin_tiempo_maximo_espera.setValue(int(c.get("duracion_maxima_espera_min", 2)))
 
-        self.campo_patron_regex.setText(c.get("patron_codigo_personalizado", ""))
+def _leer_json_cifrado(ruta, valor_por_defecto):
+    clave = _obtener_o_crear_clave()
+    if not os.path.exists(ruta):
+        return valor_por_defecto
 
-    def _guardar(self):
-        patron = self.campo_patron_regex.text().strip()
-        if patron and not utilities.patron_es_valido(patron):
-            self.etiqueta_error_regex.setText(t("error_regex_invalida"))
-            return
+    if not clave:
+        # Sin cifrado disponible: se cae a lectura en texto plano para no
+        # dejar al usuario sin poder abrir la app.
+        return _leer_json(ruta, valor_por_defecto)
 
-        nueva_configuracion = {
-            "idioma": self.combo_idioma.currentData(),
-            "tema": self.combo_tema.currentData(),
-            "proveedor_preferido": self.combo_proveedor.currentData(),
-            "notificaciones_activas": self.casilla_notificaciones.isChecked(),
-            "minimizar_a_bandeja": self.casilla_minimizar_bandeja.isChecked(),
-            "guardar_historial_mensajes": self.casilla_guardar_historial.isChecked(),
-            "auto_copiar_codigo": self.casilla_auto_copiar.isChecked(),
-            "sonido_activo": self.casilla_sonido.isChecked(),
-            "intervalo_autoactualizacion_seg": self.spin_autoactualizacion.value(),
-            "intervalo_espera_activa_seg": self.spin_intervalo_espera.value(),
-            "duracion_maxima_espera_min": self.spin_tiempo_maximo_espera.value(),
-            "patron_codigo_personalizado": patron,
-        }
+    try:
+        with open(ruta, "rb") as f:
+            contenido_cifrado = f.read()
+    except OSError:
+        return valor_por_defecto
 
-        self.ajustes_aplicados.emit(nueva_configuracion)
-        self.accept()
+    try:
+        contenido = Fernet(clave).decrypt(contenido_cifrado)
+        return json.loads(contenido.decode("utf-8"))
+    except InvalidToken:
+        try:
+            # Compatibilidad con instalaciones previas donde el archivo
+            # aún estaba en texto plano (versiones anteriores de la app).
+            return json.loads(contenido_cifrado.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            destino = _respaldar_archivo_corrupto(ruta)
+            advertencias_carga.append(
+                f"No se pudo descifrar {os.path.basename(ruta)} (¿clave "
+                f"perdida o archivo dañado?). Se restauró vacío"
+                + (f" y se guardó una copia en {destino}." if destino else ".")
+            )
+            return valor_por_defecto
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        destino = _respaldar_archivo_corrupto(ruta)
+        advertencias_carga.append(
+            f"El archivo {os.path.basename(ruta)} estaba dañado y se "
+            f"restauró vacío" + (f" (copia en {destino})." if destino else ".")
+        )
+        return valor_por_defecto
+
+
+def _escribir_json_cifrado(ruta, datos):
+    clave = _obtener_o_crear_clave()
+    contenido = json.dumps(datos, indent=2, ensure_ascii=False).encode("utf-8")
+    if not clave:
+        with open(ruta, "wb") as f:
+            f.write(contenido)
+        return
+    with open(ruta, "wb") as f:
+        f.write(Fernet(clave).encrypt(contenido))
+
+
+def cargar_cuentas():
+    return _leer_json_cifrado(_ruta(NOMBRE_ARCHIVO_CUENTAS), [])
+
+
+def guardar_cuentas(cuentas):
+    _escribir_json_cifrado(_ruta(NOMBRE_ARCHIVO_CUENTAS), cuentas)
+
+
+def cargar_historial():
+    return _leer_json(_ruta(NOMBRE_ARCHIVO_HISTORIAL), {})
+
+
+def guardar_historial(historial):
+    _escribir_json(_ruta(NOMBRE_ARCHIVO_HISTORIAL), historial)
+
+
+def registrar_mensajes_en_historial(historial, direccion, mensajes_resumen):
+    entradas = historial.setdefault(direccion, [])
+    ids_existentes = {e["id"] for e in entradas}
+
+    for m in mensajes_resumen:
+        if m.id not in ids_existentes:
+            entradas.append(m.a_dict())
+
+    return historial
+
+
+def historial_de_direccion(historial, direccion):
+    return historial.get(direccion, [])
+
+
+def eliminar_historial_de_direccion(historial, direccion):
+    historial.pop(direccion, None)
+    return historial
