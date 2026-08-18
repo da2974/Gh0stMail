@@ -1,4 +1,4 @@
-# 📧 Gestor de Correo Temporal
+# Gh0stMail — Temporary Email Desktop Client
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)
 ![PySide6](https://img.shields.io/badge/PySide6-6.6%2B-41CD52?logo=qt)
