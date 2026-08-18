@@ -4,9 +4,7 @@
 ![PySide6](https://img.shields.io/badge/PySide6-6.6%2B-41CD52?logo=qt)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-Aplicación de escritorio con interfaz fluida y cuidada (temas claro/oscuro)
-para crear direcciones de correo electrónico temporales, revisar su bandeja
-de entrada y detectar automáticamente códigos de verificación.
+A lightweight Python desktop application for creating temporary email addresses, receiving messages and automatically detecting verification codes.
 
 ## 📸 Capturas de pantalla
 
