@@ -6,45 +6,45 @@
 
 A lightweight Python desktop application for creating temporary email addresses, receiving messages and automatically detecting verification codes.
 
-## 📸 Capturas de pantalla
+## 📸 Screenshots
 
-<img width="1918" height="1078" alt="Captura de pantalla 2026-08-17 024334" src="https://github.com/user-attachments/assets/f5662978-0a63-41bb-ae45-fc7df134198c" />
+<img width="1918" height="1078" alt="Screenshot 2026-08-17 024334" src="https://github.com/user-attachments/assets/f5662978-0a63-41bb-ae45-fc7df134198c" />
 
+## ✨ Features
 
-## ✨ Funcionalidades
+- Address creation with **3 providers** (mail.tm, Guerrilla Mail, 1secMail), with automatic
+  provider switching if one fails ("Automatic" mode)
+- **Provider selector in Settings** → General → "Mail provider" to choose based on your needs
+- Inbox with search/filter by sender or subject
+- Automatic verification code detection, with a customizable
+  pattern (regular expression) from Settings
+- Local message history per address, independent of the
+  live inbox
+- Desktop notifications that can be toggled on/off + optional sound
+- System tray icon; the app can keep running in the background
+  when the window is closed (configurable)
+- Light or dark theme
+- Spanish or English language, selectable from Settings
+- Export an address (and its password, if applicable) to a text file
+- Configurable auto-refresh and wait intervals
+- **Encryption at rest** for the accounts file (Fernet/AES)
+- **Estimated expiration notice** in the address list
 
-- Creación de direcciones con **3 proveedores** (mail.tm, Guerrilla Mail, 1secMail), con cambio
-  automático de proveedor si uno falla (modo "Automático")
-- **Selector de proveedor en Ajustes** → General → "Proveedor de correo" para elegir según necesidad
-- Bandeja de entrada con búsqueda/filtro por remitente o asunto
-- Detección automática de códigos de verificación, con patrón
-  personalizable (expresión regular) desde Ajustes
-- Historial local de mensajes por dirección, independiente de la bandeja
-  en vivo
-- Notificaciones de escritorio activables/desactivables + sonido opcional
-- Icono en la bandeja del sistema; la app puede seguir en segundo plano
-  al cerrar la ventana (configurable)
-- Tema claro u oscuro
-- Idioma español o inglés, seleccionable desde Ajustes
-- Exportar una dirección (y su contraseña, si aplica) a un archivo de texto
-- Intervalos de autoactualización y de espera configurables
-- **Cifrado en reposo** del archivo de cuentas (Fernet/AES)
-- **Aviso de caducidad estimada** en la lista de direcciones
+## Email providers
 
-## Proveedores de correo
-
-| Proveedor | Mejor para | Duración |
+| Provider | Best for | Duration |
 |-----------|------------|----------|
-| **mail.tm** (recomendado por defecto) | **Usar días/semanas**: 2FA, recuperar contraseña, notificaciones futuras, cualquier cosa que necesite llegar mañana o la semana que viene | Días / semanas (según uso) |
-| **Guerrilla Mail** | **Código AHORA**: registro rápido, verificación inmediata, "necesito el código ya" | ~60 min si no se usa (se renueva al consultar) |
-| **1secMail** | **Respaldo** si los dos anteriores fallan o están lentos | Indefinida (no publicada) |
+| **mail.tm** (recommended default) | **Use for days/weeks**: 2FA, password recovery, future notifications, anything that needs to arrive tomorrow or next week | Days / weeks (depending on use) |
+| **Guerrilla Mail** | **Code NOW**: quick sign-up, immediate verification, "I need the code right now" | ~60 min if unused (renews on request) |
+| **1secMail** | **Backup** if the two above fail or are slow | Indefinite (not published) |
 
-## 🌐 Idiomas
-La aplicación está disponible en **español** e **inglés**. Puedes cambiar
-el idioma en cualquier momento desde Ajustes → General → Idioma; el cambio
-se aplica al instante, sin reiniciar la aplicación.
+## 🌐 Languages
 
-## 🚀 Instalación
+The application is available in **Spanish** and **English**. You can change
+the language at any time from Settings → General → Language; the change
+applies instantly, without restarting the application.
+
+## 🚀 Installation
 
 ```bash
 git clone https://github.com/da2974/Gh0stMail.git
@@ -52,42 +52,52 @@ cd Gh0stMail
 pip install -r requirements.txt
 ```
 
-## ▶️ Uso
+> On Linux, some distributions may need `pip` installed separately, e.g. `sudo apt install python3-pip` (Debian/Ubuntu).
+> On macOS, if Python isn't installed, you can get it via [Homebrew](https://brew.sh): `brew install python`.
 
+## ▶️ Usage
+
+**Windows:**
 ```bash
 pythonw main.py
 ```
 
-## 📁 Estructura del proyecto
+**Linux / macOS:**
+```bash
+python3 main.py
+```
 
-| Archivo/Carpeta | Descripción |
+
+## 📁 Project structure
+
+| File/Folder | Description |
 |---|---|
-| `main.py` | Ventana principal y lógica de interfaz |
-| `dialogo_ajustes.py` | Ventana modal de configuración |
-| `gestor_proveedores.py` | Selección de proveedor y failover automático (3 proveedores) |
-| `proveedores/` | Implementaciones de mail.tm, Guerrilla Mail y 1secMail |
-| `tareas.py` | Operaciones de red en hilos (QThread) |
-| `configuracion.py` / `almacenamiento.py` | Persistencia en JSON (cuentas cifradas con Fernet) |
-| `notificaciones.py` | Notificaciones de escritorio vía bandeja del sistema (+ sonido) |
-| `utilidades.py` | Detección de códigos, HTML→texto, formateo de fechas, caducidad |
-| `idiomas.py` | Textos de la interfaz en español e inglés |
-| `tema_claro.qss` / `tema_oscuro.qss` | Hojas de estilo |
+| `main.py` | Main window and interface logic |
+| `dialogo_ajustes.py` | Settings modal window |
+| `gestor_proveedores.py` | Provider selection and automatic failover (3 providers) |
+| `proveedores/` | Implementations for mail.tm, Guerrilla Mail and 1secMail |
+| `tareas.py` | Network operations in threads (QThread) |
+| `configuracion.py` / `almacenamiento.py` | JSON persistence (accounts encrypted with Fernet) |
+| `notificaciones.py` | Desktop notifications via system tray (+ sound) |
+| `utilidades.py` | Code detection, HTML→text, date formatting, expiration |
+| `idiomas.py` | Interface text in Spanish and English |
+| `tema_claro.qss` / `tema_oscuro.qss` | Stylesheets |
 
-## 🤝 Contribuir
+## 🤝 Contributing
 
-Las contribuciones son bienvenidas. Si quieres proponer un cambio:
+Contributions are welcome. If you'd like to propose a change:
 
-1. Haz un fork del repositorio
-2. Crea una rama para tu cambio (`git checkout -b mi-mejora`)
-3. Haz commit de tus cambios
-4. Abre un Pull Request
+1. Fork the repository
+2. Create a branch for your change (`git checkout -b my-improvement`)
+3. Commit your changes
+4. Open a Pull Request
 
-## ☕ Apoya el proyecto
+## ☕ Support the project
 
-Si te resulta útil, puedes invitarme a un café:
+If you find it useful, you can buy me a coffee:
 
-[![PayPal](https://img.shields.io/badge/PayPal-Donar-00457C?logo=paypal)](https://paypal.me/Davidnt20)
+[![PayPal](https://img.shields.io/badge/PayPal-Donate-00457C?logo=paypal)](https://paypal.me/Davidnt20)
 
-## 📄 Licencia
+## 📄 License
 
-Este proyecto está bajo la licencia MIT — consulta el archivo [LICENSE](LICENSE) para más detalles.
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
