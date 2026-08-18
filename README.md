@@ -52,9 +52,6 @@ cd Gh0stMail
 pip install -r requirements.txt
 ```
 
-> On Linux, some distributions may need `pip` installed separately, e.g. `sudo apt install python3-pip` (Debian/Ubuntu).
-> On macOS, if Python isn't installed, you can get it via [Homebrew](https://brew.sh): `brew install python`.
-
 ## ▶️ Usage
 
 **Windows:**
