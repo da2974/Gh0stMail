@@ -15,23 +15,33 @@ de entrada y detectar automáticamente códigos de verificación.
 
 ## ✨ Funcionalidades
 
-- Creación de direcciones con **mail.tm** o **Guerrilla Mail**, con cambio
+- Creación de direcciones con **3 proveedores** (mail.tm, Guerrilla Mail, 1secMail), con cambio
   automático de proveedor si uno falla (modo "Automático")
+- **Selector de proveedor en Ajustes** → General → "Proveedor de correo" para elegir según necesidad
 - Bandeja de entrada con búsqueda/filtro por remitente o asunto
 - Detección automática de códigos de verificación, con patrón
   personalizable (expresión regular) desde Ajustes
 - Historial local de mensajes por dirección, independiente de la bandeja
   en vivo
-- Notificaciones de escritorio activables/desactivables
+- Notificaciones de escritorio activables/desactivables + sonido opcional
 - Icono en la bandeja del sistema; la app puede seguir en segundo plano
   al cerrar la ventana (configurable)
 - Tema claro u oscuro
 - Idioma español o inglés, seleccionable desde Ajustes
 - Exportar una dirección (y su contraseña, si aplica) a un archivo de texto
 - Intervalos de autoactualización y de espera configurables
+- **Cifrado en reposo** del archivo de cuentas (Fernet/AES)
+- **Aviso de caducidad estimada** en la lista de direcciones
+
+## Proveedores de correo
+
+| Proveedor | Mejor para | Duración |
+|-----------|------------|----------|
+| **mail.tm** (recomendado por defecto) | **Usar días/semanas**: 2FA, recuperar contraseña, notificaciones futuras, cualquier cosa que necesite llegar mañana o la semana que viene | Días / semanas (según uso) |
+| **Guerrilla Mail** | **Código AHORA**: registro rápido, verificación inmediata, "necesito el código ya" | ~60 min si no se usa (se renueva al consultar) |
+| **1secMail** | **Respaldo** si los dos anteriores fallan o están lentos | Indefinida (no publicada) |
 
 ## 🌐 Idiomas
-
 La aplicación está disponible en **español** e **inglés**. Puedes cambiar
 el idioma en cualquier momento desde Ajustes → General → Idioma; el cambio
 se aplica al instante, sin reiniciar la aplicación.
@@ -56,12 +66,12 @@ pythonw main.py
 |---|---|
 | `main.py` | Ventana principal y lógica de interfaz |
 | `dialogo_ajustes.py` | Ventana modal de configuración |
-| `gestor_proveedores.py` | Selección de proveedor y failover automático |
-| `proveedores/` | Implementaciones de mail.tm y Guerrilla Mail |
+| `gestor_proveedores.py` | Selección de proveedor y failover automático (3 proveedores) |
+| `proveedores/` | Implementaciones de mail.tm, Guerrilla Mail y 1secMail |
 | `tareas.py` | Operaciones de red en hilos (QThread) |
-| `configuracion.py` / `almacenamiento.py` | Persistencia en JSON |
-| `notificaciones.py` | Notificaciones de escritorio vía bandeja del sistema |
-| `utilidades.py` | Detección de códigos y formateo de fechas |
+| `configuracion.py` / `almacenamiento.py` | Persistencia en JSON (cuentas cifradas con Fernet) |
+| `notificaciones.py` | Notificaciones de escritorio vía bandeja del sistema (+ sonido) |
+| `utilidades.py` | Detección de códigos, HTML→texto, formateo de fechas, caducidad |
 | `idiomas.py` | Textos de la interfaz en español e inglés |
 | `tema_claro.qss` / `tema_oscuro.qss` | Hojas de estilo |
 
